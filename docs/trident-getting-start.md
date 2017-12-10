@@ -2,26 +2,24 @@
 
 ## 本ドキュメントの概要
 
-本資料では NetApp trident storage orcehstrator をインストールし、設定を行い実際にストレージをプロビジョニングするところまでを確認します。
+本資料では NetApp trident storage orchestrator をインストールし、設定を行い実際にkubernetes/OpenShift からストレージをプロビジョニングするところまでを確認します。
+trident のインストール、StorageClass の作成、 PersistenVolumeClaim の作成、PVの動的な作成を一連の流れで説明したものとなります。
 
 そのため、ストレージの設定やOSの設定については簡易的なものとなっており、本番運用を検討する際には最適な設計が必要となります。
 
 また、本ドキュメントでは Kubernetes/OpenShift のインストールや設定についてはすでにできているものとして trident に特化した内容となっています。
-本ドキュメントの末尾に OpenShift Origin の Single VM 構成 (All in One 構成) で稼働を確認しています。
 
-ドキュメント上 ```oc``` コマンドを使用していますが、kubectl でも実施可能です。
+ドキュメント上 `oc` コマンドを使用していますが、`kubectl` でも実施可能です。
 
-trident のインストール、StorageClass の作成、 PersistenVolumeClaimの作成、PVの動的な作成を一連の流れで説明したものとなります。
 
 
 ## 前提条件
 
 - docker がインストール済みであること
 - kubernetes または OpenShift を導入済みであること
-- kubectl または oc コマンドが使用できること
+- `kubectl` または `oc` コマンドが使用できること
 
-
-##  動作確認した環境
+## 動作確認した環境
 
 - CentOS 7.3
 - Docker 17.10
@@ -32,7 +30,7 @@ trident のインストール、StorageClass の作成、 PersistenVolumeClaim�
 
 ## ホストOS設定
 
-```trident``` をデプロイするホストへ以下のパッケージをインストールし、サービスを有効化する。
+trident をデプロイするホストへ以下のパッケージをインストールし、サービスを有効化する。
 
 ```
 $ sudo yum install -y nfs-utils jq
@@ -49,10 +47,12 @@ $ sudo systemctl start iscsi
 trident を起動する上で必要となるバックエンドストレージの設定を実施します。
 
 今回は NFS のデータ永続化領域を準備します。
-ONTAP に ssh でログイン後、CLIでコマンドを実行していきます。
+ONTAP に ssh でログイン後、CLI でコマンドを実行していきます。
 
-以下の設定では`SVM`を作成し、データアクセスのためのインターフェース作成、
+以下の設定ではSVMを作成し、データアクセスのためのインターフェース作成、
 SVM管理者が操作(ボリュームの作成・削除・変更）ができるアグリゲートも併せて設定します。
+Broadast domain や ipspace については標準で準備されているものを使う想定です。
+環境に応じて使用ください。
 
 コマンドラインで指定するパラメータは以下の通りです。
 
@@ -141,22 +141,11 @@ If you don't see a command prompt, try pressing enter.
 --- 192.168.199.108 ping statistics ---
 2 packets transmitted, 2 packets received, 0% packet loss
 round-trip min/avg/max = 0.267/1.380/2.494 ms
-^P^H[root@openshiftorigin openshift-poc]# kubectl run -i --tty ping --image=busybox --restart=Never --rm -- ping 192.168.199.152
-If you don't see a command prompt, try pressing enter.
-                                                      PING 192.168.199.152 (192.168.199.152): 56 data bytes
-64 bytes from 192.168.199.152: seq=0 ttl=63 time=0.375 ms
-64 bytes from 192.168.199.152: seq=1 ttl=63 time=0.338 ms
-64 bytes from 192.168.199.152: seq=2 ttl=63 time=0.342 ms
-64 bytes from 192.168.199.152: seq=3 ttl=63 time=0.306 ms
-^C
---- 192.168.199.152 ping statistics ---
-4 packets transmitted, 4 packets received, 0% packet loss
-round-trip min/avg/max = 0.306/0.340/0.375 ms
 ```
 
 ## Docker image のダウンロード
 
-trident デプロイ中になければダウンロードしますが、タイムアウトが発生し失敗することもあるため
+trident デプロイ中にイメージがローカルになければダウンロードしますが、タイムアウトが発生し失敗することもあるため
 事前にダウンロードします。
 
 ```
@@ -167,7 +156,7 @@ $ docker pull quay.io/coreos/etcd:3.1.3
 
 ## Trident インストーラのダウンロード
 
-インストーラのダウンロード URL は 以下のURLからダウンロードしたいものを選択ください。
+インストーラのダウンロードは以下のURLからダウンロードしたいバージョンを確認しダウンロードURLをメモしてください。
 
 - [GitHub Release Pages] (https://github.com/NetApp/trident/releases)
 
@@ -185,15 +174,19 @@ $ wget https://github.com/NetApp/trident/releases/download/v17.10.1/trident-inst
 $ tar xzf trident*.tar.gz && cd trident-installer
 ```
 
-## tridentctl をパスの通った場所へ配置
+## tridentctl のインストール
+
+tridentctl という trident を操作するコマンドラインユティリティです。
+
+tridentctl をパスの通った場所へ配置します
 
 ```
 $ mv tridentctl /usr/local/bin/ && chmod +x /usr/local/bin/tridentctl
 ```
 
-tridentctl  のバージョンを確認。
+tridentctl  のバージョンを確認します。
 
-```command not found``` のようなエラーが出た場合は配置した場所にパスが通っているか、
+`command not found` のようなエラーが出た場合は配置した場所にパスが通っているか、
 想定の場所にコピーできているかを確認してください。
 
 ```
@@ -205,11 +198,11 @@ $ tridentctl version
 +----------------+----------------+
 ```
 
-## バックエンドの設定ファイルの作成
+## バックエンドの設定ファイルを作成
 
 コンフィグファイルの作成を行います。
 
-ここで指定する ```IP``` や ```svm``` は存在するものを指定しないと以降で行うデプロイに失敗します。
+ここで指定する `dataLIF` に指定する ip や `svm` には存在しないものを指定すると以降で行うデプロイに失敗します。
 
 ```
 cat << EOF > setup/backend.json
@@ -225,7 +218,7 @@ cat << EOF > setup/backend.json
 EOF
 ```
 
-設定パラメータについては以下のURLを参照
+設定パラメータについては以下のURLを参照ください。
 
 - [Backend configuration options](https://netapp-trident.readthedocs.io/en/latest/operations/tasks/backends/ontap.html#backend-configuration-options)
 
@@ -236,12 +229,13 @@ EOF
 |version	| 常に 1	| |
 |storageDriverName	| “ontap-nas”, “ontap-nas-economy”, “ontap-san” のいずれか| |
 |managementLIF 	| クラスタ管理またはSVM管理のIPアドレス|“10.0.0.1”|
-|dataLIF	|データ通信用のLIFTING	|Derived by the SVM unless specified|
-|svm	|使用する SVM 名	| Derived if an SVM managementLIF is specified|
+|dataLIF	|データ通信用のLIFのIP | |
+|svm	|使用する SVM 名	| |
 |username	|cluster または SVMへ接続するユーザ名 |
 |password	|cluster または SVMへ接続するユーザ名のパスワード |
 |storagePrefix	|ボリュームを作成する際にボリューム名に付与するもの |“trident”|
  
+
 ## 接続の確認
 
 OpenShift クラスタに admin として接続できることを確認。
@@ -250,7 +244,7 @@ OpenShift クラスタに admin として接続できることを確認。
 $ oc login -u system:admin
 ```
 
-## 自身のネームスペースに trident をインストール
+## アプリケーションをデプロイするネームスペースに trident をインストール
 
 backend の json ファイルを setup ディレクトリで確認
 
@@ -259,11 +253,16 @@ backend の json ファイルを setup ディレクトリで確認
     backend.json 
 ```
     
-namespace の作成
+namespace を作成し、trident をデプロイします。
 
 ```
 [root@openshiftorigin trident-installer]# oc create namespace trident
 namespace "trident" created
+```
+
+trident のインストーラーを起動します。
+
+```
 [root@openshiftorigin trident-installer]# ./install_trident.sh -n trident
 Installer assumes you have deployed OpenShift.
 clusterrolebinding "trident" deleted
@@ -280,41 +279,38 @@ configmap "trident-launcher-config" created
 pod "trident-launcher" created
 Trident deployment definition is available in /root/openshift-poc/trident/trident-installer/setup/trident-deployment.yaml.
 Started launcher in namespace "trident".
-[root@openshiftorigin trident-installer]# oc project trident
+```
+
+
+trident の起動を確認します。
+trident のポッドが起動するには数分時間がかかります。
+`oc get pods` の結果が以下の容易なればデプロイ完了です。
+
+```
+[root@openshiftorigin trident-installer]# oc get pods
+NAME                       READY     STATUS      RESTARTS   AGE
+trident-3611124473-n010g   2/2       Running     1          6m
+trident-launcher           0/1       Completed   0          6m
+```
+
+trident-xxxxx-xxxx というコンテナが起動していればデプロイ成功です。
+
+### よく起きる事象
+
+trident-ephemeral で止まる場合には backend.json が間違っているので IP や SVM が正しいことを確認
+
+```
 [root@openshiftorigin trident-installer]# oc get pods
 NAME                READY     STATUS      RESTARTS   AGE
 trident-ephemeral   1/1       Running     0          2m
 trident-launcher    0/1       Completed   0          2m
 ```
 
-## よく起きる事象
-
-trident-ephemeral で止まる場合には backend.json が間違っているので IP や SVM が正しいことを確認
-    
-数分後、ポッドの状態を確認
-    
-```
-[root@openshiftorigin setup]# oc get pods
-NAME                       READY     STATUS      RESTARTS   AGE
-trident-3611124473-n010g   2/2       Running     1          6m
-trident-launcher           0/1       Completed   0          6m
-```
-
-
-```trident-xxxxx-xxxx``` というコンテナが起動していればデプロイ成功です。
-
 ## 動作確認
 
 ### trident へバックエンドストレージを追加
 
 バックエンドの追加をします。
-
-コマンドラインオプションの解説
-
-```
- -n: namespace の指定、今回は trident を設定
-```
-
 
 ```
 [root@openshiftorigin trident-installer]# tridentctl -n trident create backend -f setup/backend.json
@@ -325,7 +321,7 @@ trident-launcher           0/1       Completed   0          6m
 +--------------------------+----------------+--------+---------+
 ```
 
-ログの確認を行います
+ログの確認を行います, "Added a new backend" が表示され、その後エラーが発生していなければ完了です。
 
 ```
 [root@openshiftorigin trident-installer]# tridentctl -n trident logs
@@ -411,9 +407,7 @@ parameters:
 ```
     
 
-以下は複数のバックエンドを使用できることの確認のためのSCを登録
-
-２つ目の確認
+２つ目の確認を行います。
 
 ```
 [root@openshiftorigin trident-installer]# cat sample-input/storage-class-basic.yaml
@@ -426,6 +420,9 @@ parameters:
   backendType: "ontap-nas"
 ```
 
+** apiVersion: storage.k8s.io/v1 がすでに使用可能ですが今回は、サンプルに包含されているものをそのまま使います。
+
+ストレージクラスを作成します。
 
 ```
 [root@openshiftorigin trident-installer]# oc create -f sample-input/storage-class-basic.yaml
@@ -511,7 +508,7 @@ trident   Bound     trident   2Gi       RWO                 5d
 
 ### サンプルアプリケーションのデプロイ
 
-ここではかんたんにウェブサーバをデプロイし、
+ここではサンプルとしてウェブサーバをデプロイし、動的にストレージをプロビジョニングします。
 
 ```
 [root@openshiftorigin trident-installer]# cd ../demo
@@ -572,8 +569,21 @@ trident-3611124473-n010g   2/2       Running   1          5d
 trident-launcher   0/1       Completed   0         5d
 ```
 
-### Technical resources
+PVC を削除します。
 
+```
+kubectl delete pvc basic
+```
+
+trident のアンインストールはインストーラディレクトリに存在する uninstall_trident.sh を実行することで削除します。
+
+```
+./uninstall_trident.sh -n trident
+```
+
+上記の削除処理をしてもストレージに永続化されたデータは残った状態となります。
+
+### Technical resources
 
 本ドキュメントを作成する上で参考にした情報源は以下の通りです。
 
