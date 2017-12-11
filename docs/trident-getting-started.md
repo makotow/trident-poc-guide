@@ -158,7 +158,7 @@ $ docker pull quay.io/coreos/etcd:3.1.3
 
 インストーラのダウンロードは以下のURLからダウンロードしたいバージョンを確認しダウンロードURLをメモしてください。
 
-- [GitHub Release Pages] (https://github.com/NetApp/trident/releases)
+- [GitHub Release Pages](https://github.com/NetApp/trident/releases)
 
 
 例えば、 17.10.1 であれば以下のURLとなります。
