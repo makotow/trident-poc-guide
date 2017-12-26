@@ -12,14 +12,14 @@ trident のインストール、StorageClass の作成、 PersistentVolumeClaim 
 
 また、本ドキュメントでは Kubernetes/OpenShift のインストールや設定についてはすでにできているものとして trident に特化した内容となっています。
 
-ドキュメント上 `oc` コマンドを使用していますが、`kubectl` でも実施可能です。
+ドキュメント上 ``oc`` コマンドを使用していますが、``kubectl`` でも実施可能です。
 
 前提条件
 ========================
 
 * docker がインストール済みであること
 * kubernetes または OpenShift を導入済みであること
-* `kubectl` または `oc` コマンドが使用できること
+* ``kubectl`` または ``oc`` コマンドが使用できること
 
 動作確認した環境
 ========================
@@ -29,11 +29,14 @@ trident のインストール、StorageClass の作成、 PersistentVolumeClaim 
 * OpenShift origin 3.6
 * trident 17.10.1
 
-![Poc](images/trident-poc.png)
+.. figure:: ../images/trident-poc.png
 
 ホストOS設定
 ========================
-trident をデプロイするホストへ以下のパッケージをインストールし、サービスを有効化する。 ::
+
+trident をデプロイするホストへ以下のパッケージをインストールし、サービスを有効化します。
+
+::
 
     $ sudo yum install -y nfs-utils jq
     $ sudo yum install -y lsscsi iscsi-initiator-utils sg3_utils device-mapper-multipath
@@ -56,7 +59,9 @@ SVM管理者が操作(ボリュームの作成・削除・変更）ができる�
 Broadcast domain や ipspace については標準で準備されているものを使う想定です。
 環境に応じて使用ください。
 
-コマンドラインで指定するパラメータは以下の通りです。 ::
+コマンドラインで指定するパラメータは以下の通りです。
+
+::
 
     $ vserver create -vserver #{SVMNAME}  -ipspace #{IPSPACE} -aggregate #{AGGR} -language C.UTF-8 -rootvolume root -rootvolume-security-style unix
     $ nfs create -vserver #{SVMNAME} -access true -v3 enabled -v4.0 enabled -tcp enabled
@@ -98,7 +103,9 @@ Broadcast domain や ipspace については標準で準備されているもの
 
 例: 以下の例では IP の割当は ONTAP の subnet 機能を使用して動的に割り当てています。
 
-ONTAP CLI の例  ::
+ONTAP CLI の例
+
+::
 
     $ vserver create -vserver tridentsvm -ipspace watanabe_ipspace_199 -aggregate aggr3 -language C.UTF-8 -rootvolume root -rootvolume-security-style unix
     $ nfs create -vserver tridentsvm -access true -v3 enabled -v4.0 enabled -tcp enabled
@@ -112,7 +119,9 @@ ONTAP CLI の例  ::
 事前確認
 ========================
 
-kubectl または oc が入っていることを確認  ::
+kubectl または oc がインストールされていることを確認します。
+
+::
 
     [root@openshiftorigin openshift-poc]# kubectl version
     Client Version: version.Info{Major:"1", Minor:"6", GitVersion:"v1.6.1+5115d708d7", GitCommit:"fff65cf", GitTreeState:"clean", BuildDate:"2017-10-25T18:58:10Z", GoVersion:"go1.7
@@ -129,7 +138,9 @@ kubectl または oc が入っていることを確認  ::
     kubernetes v1.6.1+5115d708d7
 
 
-Pod から ストレージへ接続できることを確認  ::
+Pod から ストレージへ接続できることを確認します。
+
+::
 
     [root@openshiftorigin openshift-poc]# oc login -u system:admin
     Logged into "https://10.128.221.213:8443" as "system:admin" using existing credentials.
@@ -160,7 +171,9 @@ Docker image のダウンロード
 ==================================
 
 trident デプロイ中にイメージがローカルになければダウンロードしますが、タイムアウトが発生し失敗することもあるため
-事前にダウンロードします。 ::
+事前にダウンロードします。
+
+::
 
     $ docker pull netapp/trident-launcher:17.10.1
     $ docker pull netapp/trident:17.10.1
@@ -174,11 +187,15 @@ Trident インストーラのダウンロード
 * `GitHub Release Pages <https://github.com/NetApp/trident/releases>`_
 
 
-例えば、 17.10.1 であれば以下のURLとなります。  ::
+例えば、 17.10.1 であれば以下のURLとなります。
+
+::
 
     https://github.com/NetApp/trident/releases/download/v17.10.1/trident-installer-17.10.1.tar.gz
 
-インストール後、解凍します。 ::
+インストール後、解凍します。
+
+::
 
     $ wget https://github.com/NetApp/trident/releases/download/v17.10.1/trident-installer-17.10.1.tar.gz
     $ tar xzf trident*.tar.gz && cd trident-installer
@@ -189,7 +206,9 @@ tridentctl のインストール
 
 tridentctl という trident を操作するコマンドラインユティリティです。
 
-tridentctl をパスの通った場所へ配置します。  ::
+tridentctl をパスの通った場所へ配置します。
+
+::
 
     $ mv tridentctl /usr/local/bin/ && chmod +x /usr/local/bin/tridentctl
 
@@ -197,7 +216,9 @@ tridentctl をパスの通った場所へ配置します。  ::
 tridentctl  のバージョンを確認します。
 
 command not found のようなエラーが出た場合は配置した場所にパスが通っているか、
-想定の場所にコピーできているかを確認してください。  ::
+想定の場所にコピーできているかを確認してください。
+
+::
 
     $ tridentctl version
     +----------------+----------------+
@@ -211,7 +232,9 @@ command not found のようなエラーが出た場合は配置した場所に�
 
 コンフィグファイルの作成を行います。
 
-ここで指定する `dataLIF` に指定する ip や `svm` には存在しないものを指定すると以降で行うデプロイに失敗します。  ::
+ここで指定する ``dataLIF`` に指定する ip や ``svm`` には存在しないものを指定すると以降で行うデプロイに失敗します。
+
+::
 
     cat << EOF > setup/backend.json
     {
@@ -265,26 +288,34 @@ command not found のようなエラーが出た場合は配置した場所に�
 接続の確認
 ========================
 
-OpenShift クラスタに admin として接続できることを確認。 ::
+OpenShift クラスタに admin として接続できることを確認します。
+
+::
 
   $ oc login -u system:admin
 
 アプリケーションをデプロイするネームスペースに trident をインストール
 ========================================================================
 
-backend の json ファイルを setup ディレクトリで確認します  ::
+backend の json ファイルを setup ディレクトリで確認します。
+
+::
 
   [root@openshiftorigin trident-installer]# ls setup/
     backend.json
 
 
-namespace を作成し、trident をデプロイします。 ::
+namespace を作成し、trident をデプロイします。
+
+::
 
   [root@openshiftorigin trident-installer]# oc create namespace trident
     namespace "trident" created
 
 
-trident のインストーラーを起動します。 ::
+trident のインストーラーを起動します。
+
+::
 
     [root@openshiftorigin trident-installer]# ./install_trident.sh -n trident
     Installer assumes you have deployed OpenShift.
@@ -306,7 +337,9 @@ trident のインストーラーを起動します。 ::
 
 trident の起動を確認します。
 trident のポッドが起動するには数分時間がかかります。
-oc get pods の結果が以下の容易なればデプロイ完了です。 ::
+oc get pods の結果が以下の容易なればデプロイ完了です。
+
+::
 
     [root@openshiftorigin trident-installer]# oc get pods
     NAME                       READY     STATUS      RESTARTS   AGE
@@ -315,10 +348,10 @@ oc get pods の結果が以下の容易なればデプロイ完了です。 ::
 
 trident-xxxxx-xxxx というコンテナが起動していればデプロイ成功です。
 
-よく起きる事象
-----------------
+.. note::
+   trident-ephemeral で止まる場合には backend.json が間違っているので IP や SVM が正しいことを確認してください。
 
-trident-ephemeral で止まる場合には backend.json が間違っているので IP や SVM が正しいことを確認 ::
+::
 
     [root@openshiftorigin trident-installer]# oc get pods
     NAME                READY     STATUS      RESTARTS   AGE
@@ -331,7 +364,9 @@ trident-ephemeral で止まる場合には backend.json が間違っているの
 trident へバックエンドストレージを追加
 ----------------------------------------
 
-バックエンドの追加をします。 ::
+バックエンドの追加をします。
+
+::
 
     [root@openshiftorigin trident-installer]# tridentctl -n trident create backend -f setup/backend.json
     +--------------------------+----------------+--------+---------+
@@ -340,7 +375,9 @@ trident へバックエンドストレージを追加
     | ontapnas_192.168.199.107 | ontap-nas      | true   |       0 |
     +--------------------------+----------------+--------+---------+
 
-ログの確認を行います, "Added a new backend" が表示され、その後エラーが発生していなければ完了です。 ::
+ログの確認を行います。 "Added a new backend" が表示され、その後エラーが発生していなければ完了です。
+
+::
 
     [root@openshiftorigin trident-installer]# tridentctl -n trident logs
     trident log:
@@ -351,7 +388,9 @@ trident へバックエンドストレージを追加
     time="2017-11-28T07:46:32Z" level=debug msg="Sanitizing common config." name=ontap-nas
     time="2017-11-28T07:46:32Z" level=info msg="API server REST call." duration=209.772µs method=GET route=GetBackend uri="/trident/v1/backend/ontapnas_192.168.199.107"
 
-追加した内容を確認します。 ::
+追加した内容を確認します。
+
+::
 
     [root@openshiftorigin trident-installer]# tridentctl get backend -o json -n trident
     {
@@ -406,7 +445,9 @@ StorageClass の定義
 
 StorageClass の定義ファイルを作成します。
 
-今回は trident-installer に入っているサンプルを使用し、Storage Class を作成します。 ::
+今回は trident-installer に入っているサンプルを使用し、Storage Class を作成します。
+
+::
 
     [root@openshiftorigin trident-installer]# cat sample-input/storage-class-ontap-gold.yaml
     apiVersion: storage.k8s.io/v1beta1
@@ -421,7 +462,9 @@ StorageClass の定義ファイルを作成します。
       snapshots: "true"
 
 
-２つ目の確認を行います。 ::
+２つ目の確認を行います。
+
+::
 
     [root@openshiftorigin trident-installer]# cat sample-input/storage-class-basic.yaml
     apiVersion: storage.k8s.io/v1beta1
@@ -432,9 +475,13 @@ StorageClass の定義ファイルを作成します。
     parameters:
       backendType: "ontap-nas"
 
-** apiVersion: storage.k8s.io/v1 がすでに使用可能ですが今回は、サンプルに包含されているものをそのまま使います。
+.. note::
+   apiVersion: storage.k8s.io/v1 がすでに使用可能ですが今回は、サンプルに包含されているものをそのまま使います。
 
-ストレージクラスを作成します。  ::
+
+ストレージクラスを作成します。
+
+::
 
     [root@openshiftorigin trident-installer]# oc create -f sample-input/storage-class-basic.yaml
     storageclass "basic" created
@@ -442,7 +489,9 @@ StorageClass の定義ファイルを作成します。
     [root@openshiftorigin trident-installer]# oc create -f sample-input/storage-class-ontap-gold.yaml
     storageclass "ontap-gold" created
 
-作成後の確認  ::
+作成後の確認をします。
+
+::
 
     [root@openshiftorigin trident-installer]# oc get sc
     NAME         TYPE
@@ -500,12 +549,16 @@ StorageClass の定義ファイルを作成します。
 PVC の作成
 --------------------------------
 
-StorageClassと同様にtrident-installer に入っているサンプルでPVCを作成します。 ::
+StorageClassと同様にtrident-installer に入っているサンプルでPVCを作成します。
+
+::
 
     [root@openshiftorigin trident-installer]# oc create -f sample-input/pvc-basic.yaml
     persistentvolumeclaim "basic" created
 
-作成されたPVCを確認します。  ::
+作成されたPVCを確認します。
+
+::
 
     [root@openshiftorigin trident-installer]# oc get pvc -aw
     NAME      STATUS    VOLUME                CAPACITY   ACCESSMODES   STORAGECLASS   AGE
@@ -516,7 +569,9 @@ StorageClassと同様にtrident-installer に入っているサンプルでPVC�
 サンプルアプリケーションのデプロイ
 -----------------------------------------
 
-ここではサンプルとしてウェブサーバをデプロイし、動的にストレージをプロビジョニングします。 ::
+ここではサンプルとしてウェブサーバをデプロイし、動的にストレージをプロビジョニングします。
+
+::
 
     [root@openshiftorigin trident-installer]# cd ../demo
     [root@openshiftorigin demo]# cat << EOF > task-pv-pod.yaml
@@ -544,7 +599,9 @@ StorageClassと同様にtrident-installer に入っているサンプルでPVC�
     [root@openshiftorigin demo]#
 
 
-Pod がデプロイされたことを確認。 ::
+Pod がデプロイされたことを確認します。
+
+::
 
     [root@openshiftorigin demo]# kubectl get pod -aw
     NAME          READY     STATUS    RESTARTS   AGE
@@ -552,7 +609,9 @@ Pod がデプロイされたことを確認。 ::
     trident-3611124473-n010g   2/2       Running   1         5d
     trident-launcher   0/1       Completed   0         5d
 
-Pod からストレージがマウントされていることを確認します。 ::
+Pod からストレージがマウントされていることを確認します。
+
+::
 
     [root@openshiftorigin demo]# kubectl exec -it task-pv-pod -- df -h /usr/share/nginx/html
     Filesystem                                    Size  Used Avail Use% Mounted on
@@ -561,7 +620,9 @@ Pod からストレージがマウントされていることを確認します�
 必要であれば削除処理実施
 ---------------------------
 
-Pod を削除します。 ::
+Pod を削除します。
+
+::
 
   [root@openshiftorigin trident]# kubectl delete pod task-pv-pod
   pod "task-pv-pod" deleted
@@ -570,11 +631,15 @@ Pod を削除します。 ::
   trident-3611124473-n010g   2/2       Running   1          5d
   trident-launcher   0/1       Completed   0         5d
 
-PVC を削除します。 ::
+PVC を削除します。
+
+::
 
   kubectl delete pvc basic
 
-trident のアンインストールはインストーラディレクトリに存在する uninstall_trident.sh を実行することで削除します。 ::
+trident のアンインストールはインストーラディレクトリに存在する uninstall_trident.sh を実行することで削除します。
+
+::
 
   ./uninstall_trident.sh -n trident
 
