@@ -11,7 +11,7 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-   getting-started/trident-getting-started
+   trident-getting-started/index.rst
 
 Indices and tables
 ==================
